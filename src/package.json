@@ -11,7 +11,7 @@
     "skill",
     "insult"
   ],
-  "author": "Amazon.com",
+  "author": "Nick Cantelmi",
   "license": "Apache-2.0",
   "dependencies": {
     "alexa-sdk": "^1.0.6"
