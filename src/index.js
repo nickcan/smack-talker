@@ -12,13 +12,7 @@ var languageStrings = {
                 "You think you're good, you ain't. So go fuuck yourself",
                 "Sweet baby Jesus, your beer pong game is so fuuucking bad",
                 "You gonna win? Nope. Gonna sit under the table? Yep!",
-                "You may not be the worst in the house, but you aren't the best. Nick is.",
-                "Coming up a little short, just like your love life."
-            ],
-            "NAMES": [
-                "Tony",
-                "Tyler",
-                "Dirty"
+                "You may not be the worst in the house, but you aren't the best. Nick is."
             ],
             "SKILL_NAME" : "American Insults",
             "GET_INSULT_MESSAGE" : "Here's your Insult: ",
@@ -39,37 +33,42 @@ exports.handler = function(event, context, callback) {
 };
 
 var handlers = {
-    'LaunchRequest': function () {
+    'LaunchRequest': function() {
         this.emit('TalkShit');
     },
-    'GetNewInsultIntent': function () {
+    'GetNewInsultIntent': function() {
         this.emit('TalkShit');
     },
-    'TalkShit': function () {
+    'GetNewInsultWithNameIntent': function() {
+        var insultsArr = this.t('INSULTS');
+        var insultIndex = Math.floor(Math.random() * insultsArr.length);
+        var randomInsult = insultsArr[insultIndex];
+
+        var name = this.event.request.intent.slots.Name.value;
+
+        var speechOutput = "Hey " + name + ", " + randomInsult;
+
+        this.emit(':tellWithCard', speechOutput, this.t("SKILL_NAME"), randomInsult)
+    },
+    'TalkShit': function() {
         // Get a random space Insult from the space Insults list
         // Use this.t() to get corresponding language data
         var insultsArr = this.t('INSULTS');
         var insultIndex = Math.floor(Math.random() * insultsArr.length);
         var randomInsult = insultsArr[insultIndex];
 
-        var namesArr = this.t('NAMES');
-        var nameIndex = Math.floor(Math.random() * namesArr.length);
-        var randomName = namesArr[nameIndex];
-
-        var speechOutput = "Hey " + randomName + ", " + randomInsult;
-
         // Create speech output
-        this.emit(':tellWithCard', speechOutput, this.t("SKILL_NAME"), randomInsult)
+        this.emit(':tellWithCard', randomInsult, this.t("SKILL_NAME"), randomInsult)
     },
-    'AMAZON.HelpIntent': function () {
+    'AMAZON.HelpIntent': function() {
         var speechOutput = this.t("HELP_MESSAGE");
         var reprompt = this.t("HELP_MESSAGE");
         this.emit(':ask', speechOutput, reprompt);
     },
-    'AMAZON.CancelIntent': function () {
+    'AMAZON.CancelIntent': function() {
         this.emit(':tell', this.t("STOP_MESSAGE"));
     },
-    'AMAZON.StopIntent': function () {
+    'AMAZON.StopIntent': function() {
         this.emit(':tell', this.t("STOP_MESSAGE"));
     }
 };
