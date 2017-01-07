@@ -33,20 +33,17 @@ var languageStrings = {
                     "Are they building a Wallmart here?"
                 ],
                 "fantasy football": [
-                    "Your team has more stains in its underpants than Rosie O'Donnel with food poisining",
-                    "You going to pick Philip Rivers again? You're such a fucking piece of shit"
+                    "I simply want to inform you that Evan lost in the Finals this year. Hip Hip Hooray! He's a fucking loser."
                 ]
             },
             "SKILL_NAME": "Shit Talker",
-            "WELCOME_MESSAGE": "Hello, My name is Shit Talker. I'll talk shiit to people for you. What would you like me to say?",
+            "WELCOME_MESSAGE": "Hello, My name is Shit Talker. I'll talk smack to people for you. What would you like me to say?",
             "HELP_MESSAGE": "You can say things like talk shiit or speak, and also add a name, category, or both. What would you like me to say",
             "HELP_REPROMPT": "What would you like me to say",
             "STOP_MESSAGE": "Later Asshole"
         }
     },
 };
-
-// "I simply want to inform you that Evan lost in the Finals this year. Hip Hip Hooray! He's a fucking loser.",
 
 exports.handler = function(event, context, callback) {
     var alexa = Alexa.handler(event, context);
