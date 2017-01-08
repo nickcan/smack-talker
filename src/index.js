@@ -3,39 +3,12 @@
 var Alexa = require("alexa-sdk");
 var APP_ID = undefined;
 
+var AWS = require("aws-sdk");
+var docClient = new AWS.DynamoDB.DocumentClient({region: "us-east-1"})
+
 var languageStrings = {
     "en-US": {
         "translation": {
-            "INSULTS": {
-                default: [
-                    "Two wrongs don't make a right, take your parents as an example.",
-                    "It's better to let someone think you are an Idiot than to open your mouth and prove it.",
-                    "I wasn't born with enough middle fingers to let you know how I feel about you.",
-                    "Fuuck you! That's right you heard me. Fuuck you!",
-                    "I'm jealous of people that don't know you. You're so fucking stupid.",
-                    "You're the reason they need to put instructions on shampoo bottles.",
-                    "Because of you, the gene pool needs a lifeguard.",
-                    "I'd love to see things from your perspective, but I don't think I could shove my head that far up my ass."
-                ],
-                showtime: [
-                    "your showtime game is weak you fucking bitch",
-                    "I'm surprised you ever make free throws with a green zone that small",
-                    "Is your three point setting at 0? You're fucking horrible",
-                    "You're not gonna make this shot! You Jackass!",
-                    "You think you're good at Showtime? You're not. So go fuck yourself",
-                    "How does the ground feel? You Fucking shit head",
-                    "You should let your chair play, at least it knows how to support.",
-                    "You're the human equivalent of a participation award.",
-                    "You know all those times your parents said video games would get you nowhere? They were right."
-                ],
-                golf: [
-                    "Nice shot, asshole",
-                    "Are they building a Wallmart here?"
-                ],
-                "fantasy football": [
-                    "I simply want to inform you that Evan lost in the Finals this year. Hip Hip Hooray! He's a fucking loser."
-                ]
-            },
             "SKILL_NAME": "Shit Talker",
             "WELCOME_MESSAGE": "Hello, My name is Shit Talker. I'll talk smack to people for you. What would you like me to say?",
             "HELP_MESSAGE": "You can say things like talk shiit or speak, and also add a name, category, or both. What would you like me to say",
@@ -45,13 +18,34 @@ var languageStrings = {
     },
 };
 
-exports.handler = function(event, context, callback) {
-    var alexa = Alexa.handler(event, context);
-    alexa.APP_ID = APP_ID;
-    // To enable string internationalization (i18n) features, set a resources object.
-    alexa.resources = languageStrings;
-    alexa.registerHandlers(handlers);
-    alexa.execute();
+var constructDynamoInsultsTableParams = function(category) {
+    return {
+        TableName : "Insults",
+        Key: {
+            category: category || "default"
+        }
+    };
+};
+
+var categoryCallback = function(name, err, data) {
+    if (err) {
+        console.log(err);
+    } else {
+        if (data.Item) {
+            var randomInsult = grabRandomInsult(data.Item.insults);
+
+            if (name) {
+                randomInsult = constructSpeechOuput(name, randomInsult);
+            }
+
+            this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+        } else {
+            var speechOutput = "Sorry, that category doesn't exist. What would you like me to talk shit about?"
+            var reprompt = "What would you like me to talk shit about?"
+
+            this.emit(":ask", speechOutput, reprompt);
+        }
+    }
 };
 
 var grabRandomInsult = function(insultsArr, category) {
@@ -70,6 +64,15 @@ var constructSpeechOuput = function(name, insult) {
     return "Hey " + name + ", " + insult;
 };
 
+exports.handler = function(event, context, callback) {
+    var alexa = Alexa.handler(event, context);
+    alexa.APP_ID = APP_ID;
+    // To enable string internationalization (i18n) features, set a resources object.
+    alexa.resources = languageStrings;
+    alexa.registerHandlers(handlers);
+    alexa.execute();
+};
+
 var handlers = {
     "LaunchRequest": function() {
         var speechOutput = this.t("WELCOME_MESSAGE");
@@ -81,33 +84,23 @@ var handlers = {
         this.emit("TalkShit");
     },
     "TalkShit": function() {
-        var insultsArr = this.t("INSULTS").default;
-
-        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult)
+        docClient.get(constructDynamoInsultsTableParams(), categoryCallback.bind(this, null));
     },
     "GetNewInsultWithCategoryIntent": function() {
         var category = this.event.request.intent.slots.Category.value;
-        var insultsArr = this.t("INSULTS")[category];
-        var randomInsult = grabRandomInsult(insultsArr);
 
-        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult)
+        docClient.get(constructDynamoInsultsTableParams(category), categoryCallback.bind(this, null));
     },
     "GetNewInsultWithNameIntent": function() {
-        var insultsArr = this.t("INSULTS").default;
-        var randomInsult = grabRandomInsult(insultsArr);
-
         var name = this.event.request.intent.slots.Name.value;
 
-        this.emit(":tellWithCard", constructSpeechOuput(name, randomInsult), this.t("SKILL_NAME"), randomInsult)
+        docClient.get(constructDynamoInsultsTableParams(), categoryCallback.bind(this, name));
     },
     "GetNewInsultWithNameAndCategoryIntent": function() {
-        var category = this.event.request.intent.slots.Category.value;
-        var insultsArr = this.t("INSULTS")[category];
-        var randomInsult = grabRandomInsult(insultsArr);
-
         var name = this.event.request.intent.slots.Name.value;
+        var category = this.event.request.intent.slots.Category.value;
 
-        this.emit(":tellWithCard", constructSpeechOuput(name, randomInsult), this.t("SKILL_NAME"), randomInsult)
+        docClient.get(constructDynamoInsultsTableParams(category), categoryCallback.bind(this, name));
     },
     "AMAZON.HelpIntent": function() {
         var speechOutput = this.t("HELP_MESSAGE");

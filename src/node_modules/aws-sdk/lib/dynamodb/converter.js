@@ -2,44 +2,82 @@ var util = require('../core').util;
 var typeOf = require('./types').typeOf;
 var DynamoDBSet = require('./set');
 
-function convertInput(data) {
-  if (typeOf(data) === 'Object') {
+function convertInput(data, options) {
+  options = options || {};
+  var type = typeOf(data);
+  if (type === 'Object') {
     var map = {M: {}};
     for (var key in data) {
-      map['M'][key] = convertInput(data[key]);
+      map['M'][key] = convertInput(data[key], options);
     }
     return map;
-  } else if (typeOf(data) === 'Array') {
+  } else if (type === 'Array') {
     var list = {L: []};
     for (var i = 0; i < data.length; i++) {
-      list['L'].push(convertInput(data[i]));
+      list['L'].push(convertInput(data[i], options));
     }
     return list;
-  } else if (typeOf(data) === 'Set') {
-    return formatSet(data);
-  } else if (typeOf(data) === 'String') {
+  } else if (type === 'Set') {
+    return formatSet(data, options);
+  } else if (type === 'String') {
+    if (data.length === 0 && options.convertEmptyValues) {
+      return convertInput(null);
+    }
     return { 'S': data };
-  } else if (typeOf(data) === 'Number') {
+  } else if (type === 'Number') {
     return { 'N': data.toString() };
-  } else if (typeOf(data) === 'Binary') {
+  } else if (type === 'Binary') {
+    if (data.length === 0 && options.convertEmptyValues) {
+      return convertInput(null);
+    }
     return { 'B': data };
-  } else if (typeOf(data) === 'Boolean') {
+  } else if (type === 'Boolean') {
     return {'BOOL': data};
-  } else if (typeOf(data) === 'null') {
+  } else if (type === 'null') {
     return {'NULL': true};
   }
 }
 
-function formatSet(data) {
+function formatSet(data, options) {
+  options = options || {};
+  var values = data.values;
+  if (options.convertEmptyValues) {
+    values = filterEmptySetValues(data);
+    if (values.length === 0) {
+      return convertInput(null);
+    }
+  }
+
   var map = {};
   switch (data.type) {
-    case 'String': map['SS'] = data.values; break;
-    case 'Binary': map['BS'] = data.values; break;
-    case 'Number': map['NS'] = data.values.map(function (value) {
+    case 'String': map['SS'] = values; break;
+    case 'Binary': map['BS'] = values; break;
+    case 'Number': map['NS'] = values.map(function (value) {
       return value.toString();
     });
   }
   return map;
+}
+
+function filterEmptySetValues(set) {
+    var nonEmptyValues = [];
+    var potentiallyEmptyTypes = {
+        String: true,
+        Binary: true,
+        Number: false
+    };
+    if (potentiallyEmptyTypes[set.type]) {
+        for (var i = 0; i < set.values.length; i++) {
+            if (set.values[i].length === 0) {
+                continue;
+            }
+            nonEmptyValues.push(set.values[i]);
+        }
+
+        return nonEmptyValues;
+    }
+
+    return set.values;
 }
 
 function convertOutput(data) {
