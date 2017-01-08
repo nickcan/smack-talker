@@ -35,7 +35,7 @@ var categoryCallback = function(name, err, data) {
             var randomInsult = grabRandomInsult(data.Item.insults);
 
             if (name) {
-                randomInsult = constructSpeechOuput(name, randomInsult);
+                randomInsult = constructSpeechOuputWithName(name, randomInsult);
             }
 
             this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
@@ -57,10 +57,19 @@ var isMasterName = function(name) {
     return name.toLowerCase() === "nick" || name.toLowerCase() === "nicholas";
 };
 
-var constructSpeechOuput = function(name, insult) {
+var isChuckNorris = function(name) {
+    return name.toLowerCase() === "chuck norris";
+};
+
+var constructSpeechOuputWithName = function(name, insult) {
     if (isMasterName(name)) {
-        return "I don't talk shit to Nick. I've learned not to bite the hand that feeds you. So go fuck yourself."
+        return "I don't talk shit to Nick. I've learned not to bite the hand that feeds me. So go fuck yourself."
     }
+
+    if (isChuckNorris(name)) {
+        return "Even I know better than to talk shit to chuck norris."
+    }
+
     return "Hey " + name + ", " + insult;
 };
 
@@ -87,7 +96,7 @@ var handlers = {
         docClient.get(constructDynamoInsultsTableParams(), categoryCallback.bind(this, null));
     },
     "GetNewInsultWithCategoryIntent": function() {
-        var category = this.event.request.intent.slots.Category.value;
+        var category = this.event.request.intent.slots.Category.value.toLowerCase();
 
         docClient.get(constructDynamoInsultsTableParams(category), categoryCallback.bind(this, null));
     },
@@ -98,7 +107,7 @@ var handlers = {
     },
     "GetNewInsultWithNameAndCategoryIntent": function() {
         var name = this.event.request.intent.slots.Name.value;
-        var category = this.event.request.intent.slots.Category.value;
+        var category = this.event.request.intent.slots.Category.value.toLowerCase();
 
         docClient.get(constructDynamoInsultsTableParams(category), categoryCallback.bind(this, name));
     },
