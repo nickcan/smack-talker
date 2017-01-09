@@ -1,5 +1,8 @@
 "use strict";
 
+var async = require("asyncawait/async");
+var await = require("asyncawait/await");
+
 var Alexa = require("alexa-sdk");
 var APP_ID = undefined;
 
@@ -48,9 +51,14 @@ var categoryCallback = function(name, err, data) {
     }
 };
 
-var grabRandomInsult = function(insultsArr, category) {
+var grabRandomInsult = function(insultsArr, lastItem) {
     var insultIndex = Math.floor(Math.random() * insultsArr.length);
-    return insultsArr[insultIndex];
+    var randomInsult = insultsArr[insultIndex];
+    if (insultsArr.length > 1 && lastItem && lastItem.lastInsult.message === randomInsult) {
+        return grabRandomInsult(insultsArr, lastItem);
+    } else {
+        return randomInsult;
+    }
 };
 
 var isMasterName = function(name) {
@@ -73,6 +81,58 @@ var constructSpeechOuputWithName = function(name, insult) {
     return "Hey " + name + ", " + insult;
 };
 
+var constructUpdateApplicationParams = function(applicationId, category, insult) {
+    return {
+        TableName : "Applications",
+        Item: {
+            id: applicationId,
+            lastInsult: {
+                category: category,
+                message: insult
+            }
+        }
+    };
+};
+
+var getApplication = function(applicationId) {
+    var params = {
+        TableName: "Applications",
+        Key: {
+            id: applicationId
+        }
+    };
+
+    var requestPromise = docClient.get(params).promise();
+    return requestPromise.then(function(data) { return data });
+};
+
+var updateApplication = function(applicationId, category, insult) {
+    var params = constructUpdateApplicationParams(applicationId, category, insult);
+    var requestPromise = docClient.put(params).promise();
+    return requestPromise.then(function(data) { return data });
+};
+
+var getInsult = function(category) {
+    var params = constructDynamoInsultsTableParams(category);
+    var requestPromise = docClient.get(params).promise();
+    return requestPromise.then(function(data) { return data });
+};
+
+var determineInsult = async(function(applicationId, category, name) {
+    var applicationResponse = await(getApplication(applicationId));
+
+    var insultResponse = await(getInsult(category));
+    var randomInsult = grabRandomInsult(insultResponse.Item.insults, applicationResponse.Item);
+
+    await(updateApplication(applicationId, insultResponse.Item.category, randomInsult));
+
+    if (name) {
+        return constructSpeechOuputWithName(name, randomInsult);
+    } else {
+        return randomInsult;
+    }
+});
+
 exports.handler = function(event, context, callback) {
     var alexa = Alexa.handler(event, context);
     alexa.APP_ID = APP_ID;
@@ -89,28 +149,34 @@ var handlers = {
 
         this.emit(":ask", speechOutput, reprompt);
     },
-    "GetNewInsultIntent": function() {
-        this.emit("TalkShit");
-    },
-    "TalkShit": function() {
-        docClient.get(constructDynamoInsultsTableParams(), categoryCallback.bind(this, null));
-    },
-    "GetNewInsultWithCategoryIntent": function() {
+    "GetNewInsultIntent": async(function() {
+        var applicationId = this.event.session.application.applicationId;
+        var randomInsult = await(determineInsult(applicationId));
+
+        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+    }),
+    "GetNewInsultWithCategoryIntent": async(function() {
+        var applicationId = this.event.session.application.applicationId;
         var category = this.event.request.intent.slots.Category.value.toLowerCase();
+        var randomInsult = await(determineInsult(applicationId, category));
 
-        docClient.get(constructDynamoInsultsTableParams(category), categoryCallback.bind(this, null));
-    },
-    "GetNewInsultWithNameIntent": function() {
+        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+    }),
+    "GetNewInsultWithNameIntent": async(function() {
+        var applicationId = this.event.session.application.applicationId;
         var name = this.event.request.intent.slots.Name.value;
+        var randomInsult = await(determineInsult(applicationId, null, name));
 
-        docClient.get(constructDynamoInsultsTableParams(), categoryCallback.bind(this, name));
-    },
-    "GetNewInsultWithNameAndCategoryIntent": function() {
-        var name = this.event.request.intent.slots.Name.value;
+        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+    }),
+    "GetNewInsultWithNameAndCategoryIntent": async(function() {
+        var applicationId = this.event.session.application.applicationId;
         var category = this.event.request.intent.slots.Category.value.toLowerCase();
+        var name = this.event.request.intent.slots.Name.value;
+        var randomInsult = await(determineInsult(applicationId, category, name));
 
-        docClient.get(constructDynamoInsultsTableParams(category), categoryCallback.bind(this, name));
-    },
+        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+    }),
     "AMAZON.HelpIntent": function() {
         var speechOutput = this.t("HELP_MESSAGE");
         var reprompt = this.t("HELP_REPROMPT");
