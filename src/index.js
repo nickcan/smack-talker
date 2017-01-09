@@ -30,27 +30,6 @@ var constructDynamoInsultsTableParams = function(category) {
     };
 };
 
-var categoryCallback = function(name, err, data) {
-    if (err) {
-        console.log(err);
-    } else {
-        if (data.Item) {
-            var randomInsult = grabRandomInsult(data.Item.insults);
-
-            if (name) {
-                randomInsult = constructSpeechOuputWithName(name, randomInsult);
-            }
-
-            this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
-        } else {
-            var speechOutput = "Sorry, that category doesn't exist. What would you like me to talk shit about?"
-            var reprompt = "What would you like me to talk shit about?"
-
-            this.emit(":ask", speechOutput, reprompt);
-        }
-    }
-};
-
 var grabRandomInsult = function(insultsArr, lastItem) {
     var insultIndex = Math.floor(Math.random() * insultsArr.length);
     var randomInsult = insultsArr[insultIndex];
@@ -81,14 +60,15 @@ var constructSpeechOuputWithName = function(name, insult) {
     return "Hey " + name + ", " + insult;
 };
 
-var constructUpdateApplicationParams = function(applicationId, category, insult) {
+var constructUpdateApplicationParams = function(applicationId, category, insult, timestamp) {
     return {
         TableName : "Applications",
         Item: {
             id: applicationId,
             lastInsult: {
                 category: category,
-                message: insult
+                message: insult,
+                timestamp: timestamp
             }
         }
     };
@@ -106,8 +86,8 @@ var getApplication = function(applicationId) {
     return requestPromise.then(function(data) { return data });
 };
 
-var updateApplication = function(applicationId, category, insult) {
-    var params = constructUpdateApplicationParams(applicationId, category, insult);
+var updateApplication = function(applicationId, category, insult, timestamp) {
+    var params = constructUpdateApplicationParams(applicationId, category, insult, timestamp);
     var requestPromise = docClient.put(params).promise();
     return requestPromise.then(function(data) { return data });
 };
@@ -118,13 +98,13 @@ var getInsult = function(category) {
     return requestPromise.then(function(data) { return data });
 };
 
-var determineInsult = async(function(applicationId, category, name) {
+var determineInsult = async(function(applicationId, category, name, timestamp) {
     var applicationResponse = await(getApplication(applicationId));
 
     var insultResponse = await(getInsult(category));
     var randomInsult = grabRandomInsult(insultResponse.Item.insults, applicationResponse.Item);
 
-    await(updateApplication(applicationId, insultResponse.Item.category, randomInsult));
+    await(updateApplication(applicationId, insultResponse.Item.category, randomInsult, timestamp));
 
     if (name) {
         return constructSpeechOuputWithName(name, randomInsult);
@@ -151,21 +131,24 @@ var handlers = {
     },
     "GetNewInsultIntent": async(function() {
         var applicationId = this.event.session.application.applicationId;
-        var randomInsult = await(determineInsult(applicationId));
+        var timestamp = this.event.request.timestamp;
+        var randomInsult = await(determineInsult(applicationId, null, null, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
     "GetNewInsultWithCategoryIntent": async(function() {
         var applicationId = this.event.session.application.applicationId;
         var category = this.event.request.intent.slots.Category.value.toLowerCase();
-        var randomInsult = await(determineInsult(applicationId, category));
+        var timestamp = this.event.request.timestamp;
+        var randomInsult = await(determineInsult(applicationId, category, null, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
     "GetNewInsultWithNameIntent": async(function() {
         var applicationId = this.event.session.application.applicationId;
         var name = this.event.request.intent.slots.Name.value;
-        var randomInsult = await(determineInsult(applicationId, null, name));
+        var timestamp = this.event.request.timestamp;
+        var randomInsult = await(determineInsult(applicationId, null, name, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
@@ -173,7 +156,16 @@ var handlers = {
         var applicationId = this.event.session.application.applicationId;
         var category = this.event.request.intent.slots.Category.value.toLowerCase();
         var name = this.event.request.intent.slots.Name.value;
-        var randomInsult = await(determineInsult(applicationId, category, name));
+        var timestamp = this.event.request.timestamp;
+        var randomInsult = await(determineInsult(applicationId, category, name, timestamp));
+
+        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+    }),
+    "GetChuckNorrisFactIntent": async(function() {
+        var applicationId = this.event.session.application.applicationId;
+        var category = "chuck norris"
+        var timestamp = this.event.request.timestamp;
+        var randomInsult = await(determineInsult(applicationId, category, null, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
