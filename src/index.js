@@ -12,8 +12,8 @@ var docClient = new AWS.DynamoDB.DocumentClient({region: "us-east-1"})
 var languageStrings = {
     "en-US": {
         "translation": {
-            "SKILL_NAME": "Shit Talker",
-            "WELCOME_MESSAGE": "Hello, My name is Shit Talker. I'll talk smack to people for you. What would you like me to say?",
+            "SKILL_NAME": "Smack Talker",
+            "WELCOME_MESSAGE": "Hello, My name is Smack Talker. I'll talk smack to people for you. What would you like me to say?",
             "HELP_MESSAGE": "You can say things like talk shiit or speak, and also add a name, category, or both. What would you like me to say",
             "HELP_REPROMPT": "What would you like me to say",
             "STOP_MESSAGE": "Later Asshole"
@@ -40,21 +40,13 @@ var grabRandomInsult = function(insultsArr, lastItem) {
     }
 };
 
-var isMasterName = function(name) {
-    return name.toLowerCase() === "nick" || name.toLowerCase() === "nicholas";
-};
-
 var isChuckNorris = function(name) {
     return name.toLowerCase() === "chuck norris";
 };
 
 var constructSpeechOuputWithName = function(name, insult) {
-    if (isMasterName(name)) {
-        return "I don't talk shit to Nick. I've learned not to bite the hand that feeds me. So go fuck yourself."
-    }
-
     if (isChuckNorris(name)) {
-        return "Even I know better than to talk shit to chuck norris."
+        return "Even I know better than to talk smack to chuck norris."
     }
 
     return "Hey " + name + ", " + insult;
@@ -158,14 +150,6 @@ var handlers = {
         var name = this.event.request.intent.slots.Name.value;
         var timestamp = this.event.request.timestamp;
         var randomInsult = await(determineInsult(applicationId, category, name, timestamp));
-
-        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
-    }),
-    "GetChuckNorrisFactIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
-        var category = "chuck norris"
-        var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, category, null, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
