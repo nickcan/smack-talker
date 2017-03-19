@@ -1,1 +1,18 @@
+GetNewInsultIntent shit talk
 GetNewInsultIntent talk shit
+GetNewInsultIntent talk smack
+GetNewInsultIntent smack talk
+GetNewInsultWithNameIntent talk to John
+GetNewInsultWithNameIntent talk shit to John
+GetNewInsultWithNameIntent talk smack to John
+GetNewInsultWithNameIntent speak to John
+GetNewInsultWithNameIntent tell John an insult
+GetNewInsultWithNameAndCategoryIntent talk to John about Fantasy Football
+GetNewInsultWithNameAndCategoryIntent talk shit to John about Fantasy Football
+GetNewInsultWithNameAndCategoryIntent talk smack to John about Fantasy Football
+GetNewInsultWithNameAndCategoryIntent speak to John about Fantasy Football
+GetNewInsultWithNameAndCategoryIntent tell John an insult about Fantasy Football
+GetNewInsultWithCategoryIntent talk about Fantasy Football
+GetNewInsultWithCategoryIntent talk shit about Fantasy Football
+GetNewInsultWithCategoryIntent talk smack about Fantasy Football
+GetNewInsultWithCategoryIntent speak about Fantasy Football

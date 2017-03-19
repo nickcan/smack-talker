@@ -4,6 +4,15 @@
       "intent": "GetNewInsultIntent"
     },
     {
+      "intent": "GetNewInsultWithNameIntent"
+    },
+    {
+      "intent": "GetNewInsultWithNameAndCategoryIntent"
+    },
+    {
+      "intent": "GetNewInsultWithCategoryIntent"
+    },
+    {
       "intent": "AMAZON.HelpIntent"
     },
     {
