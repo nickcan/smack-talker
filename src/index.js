@@ -14,9 +14,9 @@ var languageStrings = {
         "translation": {
             "SKILL_NAME": "Smack Talker",
             "WELCOME_MESSAGE": "Hello, My name is Smack Talker. I'll talk smack to people for you. What would you like me to say?",
-            "HELP_MESSAGE": "You can say things like talk shiit or speak, and also add a name, category, or both. What would you like me to say",
-            "HELP_REPROMPT": "What would you like me to say",
-            "STOP_MESSAGE": "Later Asshole"
+            "HELP_MESSAGE": "You can say things like talk smack or speak to any first name, about a category, or both. What would you like me to say?",
+            "HELP_REPROMPT": "What would you like me to say ass hole?",
+            "STOP_MESSAGE": "Later ass hole"
         }
     },
 };
@@ -52,11 +52,11 @@ var constructSpeechOuputWithName = function(name, insult) {
     return "Hey " + name + ", " + insult;
 };
 
-var constructUpdateApplicationParams = function(applicationId, category, insult, timestamp) {
+var constructUpdateApplicationParams = function(userId, category, insult, timestamp) {
     return {
         TableName : "Applications",
         Item: {
-            id: applicationId,
+            id: userId,
             lastInsult: {
                 category: category,
                 message: insult,
@@ -66,11 +66,11 @@ var constructUpdateApplicationParams = function(applicationId, category, insult,
     };
 };
 
-var getApplication = function(applicationId) {
+var getApplication = function(userId) {
     var params = {
         TableName: "Applications",
         Key: {
-            id: applicationId
+            id: userId
         }
     };
 
@@ -78,8 +78,8 @@ var getApplication = function(applicationId) {
     return requestPromise.then(function(data) { return data });
 };
 
-var updateApplication = function(applicationId, category, insult, timestamp) {
-    var params = constructUpdateApplicationParams(applicationId, category, insult, timestamp);
+var updateApplication = function(userId, category, insult, timestamp) {
+    var params = constructUpdateApplicationParams(userId, category, insult, timestamp);
     var requestPromise = docClient.put(params).promise();
     return requestPromise.then(function(data) { return data });
 };
@@ -90,13 +90,13 @@ var getInsult = function(category) {
     return requestPromise.then(function(data) { return data });
 };
 
-var determineInsult = async(function(applicationId, category, name, timestamp) {
-    var applicationResponse = await(getApplication(applicationId));
+var determineInsult = async(function(userId, category, name, timestamp) {
+    var applicationResponse = await(getApplication(userId));
 
     var insultResponse = await(getInsult(category));
     var randomInsult = grabRandomInsult(insultResponse.Item.insults, applicationResponse.Item);
 
-    await(updateApplication(applicationId, insultResponse.Item.category, randomInsult, timestamp));
+    await(updateApplication(userId, insultResponse.Item.category, randomInsult, timestamp));
 
     if (name) {
         return constructSpeechOuputWithName(name, randomInsult);
@@ -122,34 +122,34 @@ var handlers = {
         this.emit(":ask", speechOutput, reprompt);
     },
     "GetNewInsultIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
+        var userId = this.event.session.user.userId;
         var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, null, null, timestamp));
+        var randomInsult = await(determineInsult(userId, null, null, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
     "GetNewInsultWithCategoryIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
+        var userId = this.event.session.user.userId;
         var category = this.event.request.intent.slots.Category.value.toLowerCase();
         var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, category, null, timestamp));
+        var randomInsult = await(determineInsult(userId, category, null, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
     "GetNewInsultWithNameIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
+        var userId = this.event.session.user.userId;
         var name = this.event.request.intent.slots.Name.value;
         var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, null, name, timestamp));
+        var randomInsult = await(determineInsult(userId, null, name, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
     "GetNewInsultWithNameAndCategoryIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
+        var userId = this.event.session.user.userId;
         var category = this.event.request.intent.slots.Category.value.toLowerCase();
         var name = this.event.request.intent.slots.Name.value;
         var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, category, name, timestamp));
+        var randomInsult = await(determineInsult(userId, category, name, timestamp));
 
         this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
     }),
