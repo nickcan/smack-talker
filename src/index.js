@@ -4,9 +4,10 @@ var async = require("asyncawait/async");
 var await = require("asyncawait/await");
 
 var Alexa = require("alexa-sdk");
-var APP_ID = undefined;
-
 var AWS = require("aws-sdk");
+
+var SMACK_TALKER_APP_ID = process.env.SMACK_TALKER_APP_ID;
+
 var docClient = new AWS.DynamoDB.DocumentClient({region: "us-east-1"})
 
 var languageStrings = {
@@ -107,8 +108,12 @@ var determineInsult = async(function(opts) {
 });
 
 exports.handler = function(event, context, callback) {
+    if (event.session.application.applicationId !== SMACK_TALKER_APP_ID) {
+        throw new Error("Incorrect application ID");
+    }
+
     var alexa = Alexa.handler(event, context);
-    alexa.APP_ID = APP_ID;
+    alexa.appId = SMACK_TALKER_APP_ID;
     // To enable string internationalization (i18n) features, set a resources object.
     alexa.resources = languageStrings;
     alexa.registerHandlers(handlers);
