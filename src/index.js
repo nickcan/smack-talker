@@ -19,7 +19,7 @@ var LANGUAGE_STRINGS = {
             "HELP_REPROMPT": "What would you like me to say ass hole?",
             "STOP_MESSAGE": "Later ass hole"
         }
-    },
+    }
 };
 
 var LIST_OF_CATEGORIES = [
