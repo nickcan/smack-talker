@@ -4,9 +4,10 @@ var async = require("asyncawait/async");
 var await = require("asyncawait/await");
 
 var Alexa = require("alexa-sdk");
-var APP_ID = undefined;
-
 var AWS = require("aws-sdk");
+
+var SMACK_TALKER_APP_ID = process.env.SMACK_TALKER_APP_ID;
+
 var docClient = new AWS.DynamoDB.DocumentClient({region: "us-east-1"})
 
 var languageStrings = {
@@ -14,9 +15,9 @@ var languageStrings = {
         "translation": {
             "SKILL_NAME": "Smack Talker",
             "WELCOME_MESSAGE": "Hello, My name is Smack Talker. I'll talk smack to people for you. What would you like me to say?",
-            "HELP_MESSAGE": "You can say things like talk shiit or speak, and also add a name, category, or both. What would you like me to say",
-            "HELP_REPROMPT": "What would you like me to say",
-            "STOP_MESSAGE": "Later Asshole"
+            "HELP_MESSAGE": "You can say things like talk smack or speak to any first name, about a category, or both. What would you like me to say?",
+            "HELP_REPROMPT": "What would you like me to say ass hole?",
+            "STOP_MESSAGE": "Later ass hole"
         }
     },
 };
@@ -40,37 +41,34 @@ var grabRandomInsult = function(insultsArr, lastItem) {
     }
 };
 
-var isChuckNorris = function(name) {
-    return name.toLowerCase() === "chuck norris";
-};
-
-var constructSpeechOuputWithName = function(name, insult) {
-    if (isChuckNorris(name)) {
-        return "Even I know better than to talk smack to chuck norris."
+var constructSpeechOutput = function(name, insult) {
+    if (name) {
+        return "Hey " + name + ", " + insult;
+    } else {
+        return insult;
     }
-
-    return "Hey " + name + ", " + insult;
 };
 
-var constructUpdateApplicationParams = function(applicationId, category, insult, timestamp) {
+var constructUpdateApplicationParams = function(opts) {
     return {
-        TableName : "Applications",
         Item: {
-            id: applicationId,
+            id: opts.userId,
             lastInsult: {
-                category: category,
-                message: insult,
-                timestamp: timestamp
+                category: opts.category,
+                message: opts.insult,
+                name: opts.name || null,
+                timestamp: opts.timestamp
             }
-        }
+        },
+        TableName : "Applications"
     };
 };
 
-var getApplication = function(applicationId) {
+var getApplication = function(userId) {
     var params = {
         TableName: "Applications",
         Key: {
-            id: applicationId
+            id: userId
         }
     };
 
@@ -78,8 +76,8 @@ var getApplication = function(applicationId) {
     return requestPromise.then(function(data) { return data });
 };
 
-var updateApplication = function(applicationId, category, insult, timestamp) {
-    var params = constructUpdateApplicationParams(applicationId, category, insult, timestamp);
+var updateApplication = function(opts) {
+    var params = constructUpdateApplicationParams(opts);
     var requestPromise = docClient.put(params).promise();
     return requestPromise.then(function(data) { return data });
 };
@@ -90,24 +88,32 @@ var getInsult = function(category) {
     return requestPromise.then(function(data) { return data });
 };
 
-var determineInsult = async(function(applicationId, category, name, timestamp) {
-    var applicationResponse = await(getApplication(applicationId));
+var determineInsult = async(function(opts) {
+    var applicationResponse = await(getApplication(opts.userId));
 
-    var insultResponse = await(getInsult(category));
+    var insultResponse = await(getInsult(opts.category));
     var randomInsult = grabRandomInsult(insultResponse.Item.insults, applicationResponse.Item);
 
-    await(updateApplication(applicationId, insultResponse.Item.category, randomInsult, timestamp));
+    var updateOptions = {
+        category: insultResponse.Item.category,
+        insult: randomInsult,
+        name: opts.name,
+        timestamp: opts.timestamp,
+        userId: opts.userId
+    };
 
-    if (name) {
-        return constructSpeechOuputWithName(name, randomInsult);
-    } else {
-        return randomInsult;
-    }
+    await(updateApplication(updateOptions));
+
+    return constructSpeechOutput(opts.name, randomInsult);
 });
 
 exports.handler = function(event, context, callback) {
+    if (event.session.application.applicationId !== SMACK_TALKER_APP_ID) {
+        throw new Error("Incorrect application ID");
+    }
+
     var alexa = Alexa.handler(event, context);
-    alexa.APP_ID = APP_ID;
+    alexa.appId = SMACK_TALKER_APP_ID;
     // To enable string internationalization (i18n) features, set a resources object.
     alexa.resources = languageStrings;
     alexa.registerHandlers(handlers);
@@ -122,36 +128,78 @@ var handlers = {
         this.emit(":ask", speechOutput, reprompt);
     },
     "GetNewInsultIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
+        var userId = this.event.session.user.userId;
         var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, null, null, timestamp));
 
-        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+        var insultOpts = {
+            timestamp: timestamp,
+            userId: userId
+        };
+
+        var insult = await(determineInsult(insultOpts));
+
+        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
     }),
     "GetNewInsultWithCategoryIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
+        var userId = this.event.session.user.userId;
         var category = this.event.request.intent.slots.Category.value.toLowerCase();
         var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, category, null, timestamp));
 
-        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+        var insultOpts = {
+            category: category,
+            timestamp: timestamp,
+            userId: userId
+        };
+
+        var insult = await(determineInsult(insultOpts));
+
+        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
     }),
     "GetNewInsultWithNameIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
+        var userId = this.event.session.user.userId;
         var name = this.event.request.intent.slots.Name.value;
         var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, null, name, timestamp));
 
-        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+        var insultOpts = {
+            name: name,
+            timestamp: timestamp,
+            userId: userId
+        };
+
+        var insult = await(determineInsult(insultOpts));
+
+        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
     }),
     "GetNewInsultWithNameAndCategoryIntent": async(function() {
-        var applicationId = this.event.session.application.applicationId;
+        var userId = this.event.session.user.userId;
         var category = this.event.request.intent.slots.Category.value.toLowerCase();
         var name = this.event.request.intent.slots.Name.value;
         var timestamp = this.event.request.timestamp;
-        var randomInsult = await(determineInsult(applicationId, category, name, timestamp));
 
-        this.emit(":tellWithCard", randomInsult, this.t("SKILL_NAME"), randomInsult);
+        var insultOpts = {
+            category: category,
+            name: name,
+            timestamp: timestamp,
+            userId: userId
+        };
+
+        var insult = await(determineInsult(insultOpts));
+
+        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
+    }),
+    "RepeatLastSpokenInsultIntent": async(function() {
+        var userId = this.event.session.user.userId;
+        var timestamp = this.event.request.timestamp;
+        var applicationResponse = await(getApplication(userId));
+        var item = applicationResponse.Item;
+
+        if (item && item.lastInsult.category && item.lastInsult.message) {
+            var message = "From the " + item.lastInsult.category + " category. " + constructSpeechOutput(item.lastInsult.name, item.lastInsult.message);
+            this.emit(":tellWithCard", message, this.t("SKILL_NAME"), message);
+        } else {
+            var message = "Sorry, there has not been an insult saved for your application yet. Please tell Smack Talker to send and insult.";
+            this.emit(":tellWithCard", message, this.t("SKILL_NAME"), message);
+        }
     }),
     "AMAZON.HelpIntent": function() {
         var speechOutput = this.t("HELP_MESSAGE");
