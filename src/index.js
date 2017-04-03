@@ -8,9 +8,9 @@ var AWS = require("aws-sdk");
 
 var SMACK_TALKER_APP_ID = process.env.SMACK_TALKER_APP_ID;
 
-var docClient = new AWS.DynamoDB.DocumentClient({region: "us-east-1"})
+var docClient = new AWS.DynamoDB.DocumentClient({region: "us-east-1"});
 
-var languageStrings = {
+var LANGUAGE_STRINGS = {
     "en-US": {
         "translation": {
             "SKILL_NAME": "Smack Talker",
@@ -19,26 +19,31 @@ var languageStrings = {
             "HELP_REPROMPT": "What would you like me to say ass hole?",
             "STOP_MESSAGE": "Later ass hole"
         }
-    },
+    }
+};
+
+var LIST_OF_CATEGORIES = [
+    "beer pong",
+    "fantasy football",
+    "love life",
+    "yo mama"
+];
+
+var calculateRequestCount = function(application) {
+    if (application) {
+        return application.requestCount + 1 || 1;
+    } else {
+        return 1;
+    }
 };
 
 var constructDynamoInsultsTableParams = function(category) {
     return {
         TableName : "Insults",
         Key: {
-            category: category || "default"
+            category: category ? category.toLowerCase() : "default"
         }
     };
-};
-
-var grabRandomInsult = function(insultsArr, lastItem) {
-    var insultIndex = Math.floor(Math.random() * insultsArr.length);
-    var randomInsult = insultsArr[insultIndex];
-    if (insultsArr.length > 1 && lastItem && lastItem.lastInsult.message === randomInsult) {
-        return grabRandomInsult(insultsArr, lastItem);
-    } else {
-        return randomInsult;
-    }
 };
 
 var constructSpeechOutput = function(name, insult) {
@@ -49,16 +54,15 @@ var constructSpeechOutput = function(name, insult) {
     }
 };
 
-var constructUpdateApplicationParams = function(opts) {
+var constructDynamoUpdateApplicationParams = function(opts) {
     return {
         Item: {
+            category: opts.category,
             id: opts.userId,
-            lastInsult: {
-                category: opts.category,
-                message: opts.insult,
-                name: opts.name || null,
-                timestamp: opts.timestamp
-            }
+            insult: opts.insult,
+            name: opts.name,
+            requestCount: opts.requestCount,
+            updatedAt: opts.timestamp
         },
         TableName : "Applications"
     };
@@ -76,28 +80,49 @@ var getApplication = function(userId) {
     return requestPromise.then(function(data) { return data });
 };
 
-var updateApplication = function(opts) {
-    var params = constructUpdateApplicationParams(opts);
-    var requestPromise = docClient.put(params).promise();
+var getInsultsFromDynamoByCategory = function(category) {
+    var params = constructDynamoInsultsTableParams(category);
+    var requestPromise = docClient.get(params).promise();
     return requestPromise.then(function(data) { return data });
 };
 
-var getInsult = function(category) {
-    var params = constructDynamoInsultsTableParams(category);
-    var requestPromise = docClient.get(params).promise();
+var grabRandomInsult = function(insultsArr, lastItem) {
+    var insultIndex = Math.floor(Math.random() * insultsArr.length);
+    var randomInsult = insultsArr[insultIndex];
+    if (insultsArr.length > 1 && lastItem && lastItem.insult === randomInsult) {
+        return grabRandomInsult(insultsArr, lastItem);
+    } else {
+        return randomInsult;
+    }
+};
+
+var grabRandomCategory = function() {
+    var categoryIndex = Math.floor(Math.random() * LIST_OF_CATEGORIES.length);
+    return LIST_OF_CATEGORIES[categoryIndex];
+};
+
+var updateApplication = function(opts) {
+    var params = constructDynamoUpdateApplicationParams(opts);
+    var requestPromise = docClient.put(params).promise();
     return requestPromise.then(function(data) { return data });
 };
 
 var determineInsult = async(function(opts) {
     var applicationResponse = await(getApplication(opts.userId));
 
-    var insultResponse = await(getInsult(opts.category));
-    var randomInsult = grabRandomInsult(insultResponse.Item.insults, applicationResponse.Item);
+    var insultsByCategoryResponse = await(getInsultsFromDynamoByCategory(opts.category));
+
+    if (opts.category && !insultsByCategoryResponse.Item) {
+        return "Sorry, we don't have a category called " + opts.category + ", try talking smack to someone about " + grabRandomCategory();
+    }
+
+    var randomInsult = grabRandomInsult(insultsByCategoryResponse.Item.insults, applicationResponse.Item);
 
     var updateOptions = {
-        category: insultResponse.Item.category,
+        category: insultsByCategoryResponse.Item.category,
         insult: randomInsult,
         name: opts.name,
+        requestCount: calculateRequestCount(applicationResponse.Item),
         timestamp: opts.timestamp,
         userId: opts.userId
     };
@@ -106,19 +131,6 @@ var determineInsult = async(function(opts) {
 
     return constructSpeechOutput(opts.name, randomInsult);
 });
-
-exports.handler = function(event, context, callback) {
-    if (event.session.application.applicationId !== SMACK_TALKER_APP_ID) {
-        throw new Error("Incorrect application ID");
-    }
-
-    var alexa = Alexa.handler(event, context);
-    alexa.appId = SMACK_TALKER_APP_ID;
-    // To enable string internationalization (i18n) features, set a resources object.
-    alexa.resources = languageStrings;
-    alexa.registerHandlers(handlers);
-    alexa.execute();
-};
 
 var handlers = {
     "LaunchRequest": function() {
@@ -142,7 +154,7 @@ var handlers = {
     }),
     "GetNewInsultWithCategoryIntent": async(function() {
         var userId = this.event.session.user.userId;
-        var category = this.event.request.intent.slots.Category.value.toLowerCase();
+        var category = this.event.request.intent.slots.Category.value;
         var timestamp = this.event.request.timestamp;
 
         var insultOpts = {
@@ -172,7 +184,7 @@ var handlers = {
     }),
     "GetNewInsultWithNameAndCategoryIntent": async(function() {
         var userId = this.event.session.user.userId;
-        var category = this.event.request.intent.slots.Category.value.toLowerCase();
+        var category = this.event.request.intent.slots.Category.value;
         var name = this.event.request.intent.slots.Name.value;
         var timestamp = this.event.request.timestamp;
 
@@ -193,8 +205,8 @@ var handlers = {
         var applicationResponse = await(getApplication(userId));
         var item = applicationResponse.Item;
 
-        if (item && item.lastInsult.category && item.lastInsult.message) {
-            var message = "From the " + item.lastInsult.category + " category. " + constructSpeechOutput(item.lastInsult.name, item.lastInsult.message);
+        if (item && item.category && item.insult) {
+            var message = "From the " + item.category + " category. " + constructSpeechOutput(item.name, item.insult);
             this.emit(":tellWithCard", message, this.t("SKILL_NAME"), message);
         } else {
             var message = "Sorry, there has not been an insult saved for your application yet. Please tell Smack Talker to send and insult.";
@@ -213,4 +225,17 @@ var handlers = {
     "AMAZON.StopIntent": function() {
         this.emit(":tell", this.t("STOP_MESSAGE"));
     }
+};
+
+exports.handler = function(event, context, callback) {
+    if (event.session.application.applicationId !== SMACK_TALKER_APP_ID) {
+        throw new Error("Incorrect application ID");
+    }
+
+    var alexa = Alexa.handler(event, context);
+    alexa.appId = SMACK_TALKER_APP_ID;
+    // To enable string internationalization (i18n) features, set a resources object.
+    alexa.resources = LANGUAGE_STRINGS;
+    alexa.registerHandlers(handlers);
+    alexa.execute();
 };
