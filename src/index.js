@@ -41,7 +41,7 @@ var constructDynamoInsultsTableParams = function(category) {
     return {
         TableName : "Insults",
         Key: {
-            category: category || "default"
+            category: category ? category.toLowerCase() : "default"
         }
     };
 };
@@ -57,14 +57,12 @@ var constructSpeechOutput = function(name, insult) {
 var constructDynamoUpdateApplicationParams = function(opts) {
     return {
         Item: {
+            category: opts.category,
             id: opts.userId,
-            lastInsult: {
-                category: opts.category,
-                message: opts.insult,
-                name: opts.name || null,
-                timestamp: opts.timestamp
-            },
-            requestCount: opts.requestCount
+            insult: opts.insult,
+            name: opts.name,
+            requestCount: opts.requestCount,
+            updatedAt: opts.timestamp
         },
         TableName : "Applications"
     };
@@ -91,7 +89,7 @@ var getInsultsFromDynamoByCategory = function(category) {
 var grabRandomInsult = function(insultsArr, lastItem) {
     var insultIndex = Math.floor(Math.random() * insultsArr.length);
     var randomInsult = insultsArr[insultIndex];
-    if (insultsArr.length > 1 && lastItem && lastItem.lastInsult.message === randomInsult) {
+    if (insultsArr.length > 1 && lastItem && lastItem.insult === randomInsult) {
         return grabRandomInsult(insultsArr, lastItem);
     } else {
         return randomInsult;
@@ -156,7 +154,7 @@ var handlers = {
     }),
     "GetNewInsultWithCategoryIntent": async(function() {
         var userId = this.event.session.user.userId;
-        var category = this.event.request.intent.slots.Category.value.toLowerCase();
+        var category = this.event.request.intent.slots.Category.value;
         var timestamp = this.event.request.timestamp;
 
         var insultOpts = {
@@ -186,7 +184,7 @@ var handlers = {
     }),
     "GetNewInsultWithNameAndCategoryIntent": async(function() {
         var userId = this.event.session.user.userId;
-        var category = this.event.request.intent.slots.Category.value.toLowerCase();
+        var category = this.event.request.intent.slots.Category.value;
         var name = this.event.request.intent.slots.Name.value;
         var timestamp = this.event.request.timestamp;
 
@@ -207,8 +205,8 @@ var handlers = {
         var applicationResponse = await(getApplication(userId));
         var item = applicationResponse.Item;
 
-        if (item && item.lastInsult.category && item.lastInsult.message) {
-            var message = "From the " + item.lastInsult.category + " category. " + constructSpeechOutput(item.lastInsult.name, item.lastInsult.message);
+        if (item && item.category && item.insult) {
+            var message = "From the " + item.category + " category. " + constructSpeechOutput(item.name, item.insult);
             this.emit(":tellWithCard", message, this.t("SKILL_NAME"), message);
         } else {
             var message = "Sorry, there has not been an insult saved for your application yet. Please tell Smack Talker to send and insult.";
