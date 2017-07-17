@@ -233,7 +233,7 @@ exports.handler = function(event, context, callback) {
     }
 
     var alexa = Alexa.handler(event, context);
-    alexa.appId = SMACK_TALKER_APP_ID;
+    alexa.APP_ID = SMACK_TALKER_APP_ID;
     // To enable string internationalization (i18n) features, set a resources object.
     alexa.resources = LANGUAGE_STRINGS;
     alexa.registerHandlers(handlers);
