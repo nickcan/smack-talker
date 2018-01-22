@@ -133,12 +133,19 @@ var determineInsult = async(function(opts) {
 });
 
 var handlers = {
-    "LaunchRequest": function() {
-        var speechOutput = this.t("WELCOME_MESSAGE");
-        var reprompt = this.t("HELP_REPROMPT");
+    "LaunchRequest": async(function() {
+        var userId = this.event.session.user.userId;
+        var timestamp = this.event.request.timestamp;
 
-        this.emit(":ask", speechOutput, reprompt);
-    },
+        var insultOpts = {
+            timestamp: timestamp,
+            userId: userId
+        };
+
+        var insult = await(determineInsult(insultOpts));
+
+        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
+    }),
     "GetNewInsultIntent": async(function() {
         var userId = this.event.session.user.userId;
         var timestamp = this.event.request.timestamp;
