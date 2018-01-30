@@ -10,17 +10,9 @@ var SMACK_TALKER_APP_ID = process.env.SMACK_TALKER_APP_ID;
 
 var docClient = new AWS.DynamoDB.DocumentClient({region: "us-east-1"});
 
-var LANGUAGE_STRINGS = {
-    "en-US": {
-        "translation": {
-            "SKILL_NAME": "Smack Talker",
-            "WELCOME_MESSAGE": "Hello, My name is Smack Talker. I'll talk smack to people for you. What would you like me to say?",
-            "HELP_MESSAGE": "You can say things like talk smack or speak to any first name, about a category, or both. What would you like me to say?",
-            "HELP_REPROMPT": "What would you like me to say ass hole?",
-            "STOP_MESSAGE": "Later ass hole"
-        }
-    }
-};
+var HELP_MESSAGE = "You can say things like talk smack or speak to any first name, about a category, or both. What would you like me to say?",
+    HELP_REPROMPT = "What would you like me to say ass hole?",
+    STOP_MESSAGE = "Later ass hole";
 
 var LIST_OF_CATEGORIES = [
     "beer pong",
@@ -144,7 +136,7 @@ var handlers = {
 
         var insult = await(determineInsult(insultOpts));
 
-        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
+        this.emit(":tell", insult);
     }),
     "GetNewInsultIntent": async(function() {
         var userId = this.event.session.user.userId;
@@ -157,7 +149,7 @@ var handlers = {
 
         var insult = await(determineInsult(insultOpts));
 
-        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
+        this.emit(":tell", insult);
     }),
     "GetNewInsultWithCategoryIntent": async(function() {
         var userId = this.event.session.user.userId;
@@ -172,7 +164,7 @@ var handlers = {
 
         var insult = await(determineInsult(insultOpts));
 
-        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
+        this.emit(":tell", insult);
     }),
     "GetNewInsultWithNameIntent": async(function() {
         var userId = this.event.session.user.userId;
@@ -187,7 +179,7 @@ var handlers = {
 
         var insult = await(determineInsult(insultOpts));
 
-        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
+        this.emit(":tell", insult);
     }),
     "GetNewInsultWithNameAndCategoryIntent": async(function() {
         var userId = this.event.session.user.userId;
@@ -204,7 +196,7 @@ var handlers = {
 
         var insult = await(determineInsult(insultOpts));
 
-        this.emit(":tellWithCard", insult, this.t("SKILL_NAME"), insult);
+        this.emit(":tell", insult);
     }),
     "RepeatLastSpokenInsultIntent": async(function() {
         var userId = this.event.session.user.userId;
@@ -214,23 +206,20 @@ var handlers = {
 
         if (item && item.category && item.insult) {
             var message = "From the " + item.category + " category. " + constructSpeechOutput(item.name, item.insult);
-            this.emit(":tellWithCard", message, this.t("SKILL_NAME"), message);
+            this.emit(":tell", message);
         } else {
             var message = "Sorry, there has not been an insult saved for your application yet. Please tell Smack Talker to send and insult.";
-            this.emit(":tellWithCard", message, this.t("SKILL_NAME"), message);
+            this.emit(":tell", message);
         }
     }),
     "AMAZON.HelpIntent": function() {
-        var speechOutput = this.t("HELP_MESSAGE");
-        var reprompt = this.t("HELP_REPROMPT");
-
-        this.emit(":ask", speechOutput, reprompt);
+        this.emit(":ask", HELP_MESSAGE, HELP_REPROMPT);
     },
     "AMAZON.CancelIntent": function() {
-        this.emit(":tell", this.t("STOP_MESSAGE"));
+        this.emit(":tell", STOP_MESSAGE);
     },
     "AMAZON.StopIntent": function() {
-        this.emit(":tell", this.t("STOP_MESSAGE"));
+        this.emit(":tell", STOP_MESSAGE);
     }
 };
 
@@ -240,9 +229,9 @@ exports.handler = function(event, context, callback) {
     }
 
     var alexa = Alexa.handler(event, context);
+
     alexa.APP_ID = SMACK_TALKER_APP_ID;
-    // To enable string internationalization (i18n) features, set a resources object.
-    alexa.resources = LANGUAGE_STRINGS;
+
     alexa.registerHandlers(handlers);
     alexa.execute();
 };
